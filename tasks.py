@@ -17,16 +17,15 @@ def deploy_griptape(c, dev=False):
         raise ValueError(f"{structure_var_name} not found in .env.tasks file")
     diff = True
     try:
-        c.run(f'git add . && git commit -m "Deploy"', pty=True, hide=True)
+        c.run(f'git add . && git commit -m "Deploy"', hide=True)
     except:
         diff = False
     c.run(
         f"git push origin $(git branch --show-current):griptape_cloud{"_dev" if dev else ""} --force",
-        pty=True,
         hide=True,
     )
     if diff:
-        c.run("git reset HEAD~1", pty=True, hide=True)
+        c.run("git reset HEAD~1", hide=True)
 
     log(c, "Deployed to griptape cloud")
 
