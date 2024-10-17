@@ -49,11 +49,15 @@ def respond_in_thread(body: dict, payload: dict, say: Say, client: WebClient):
     team_id = body["team_id"]
     app_id = body["api_app_id"]
     thread_ts = payload.get("thread_ts", payload["ts"])
-    thinking_res = say(
-        **thinking_payload(),
-        thread_ts=thread_ts,
+    ts = body.get(
+        "ack_message_ts",
+        say(
+            **thinking_payload(),
+            thread_ts=thread_ts,
+        )["ts"],
     )
-    ts = thinking_res["ts"]
+
+    stream = False
 
     try:
         rulesets = get_rulesets(
@@ -116,8 +120,10 @@ def respond_in_thread(body: dict, payload: dict, say: Say, client: WebClient):
                 )
 
 
-def handle_slack_event(body: str, headers: dict) -> dict:
+def handle_slack_event(body: str, headers: dict, ack_message_ts: str | None) -> dict:
     req = BoltRequest(body=body, headers=headers)
+    if ack_message_ts is not None:
+        req.body["ack_message_ts"] = ack_message_ts
     bolt_response = app.dispatch(req=req)
     return {
         "status": bolt_response.status,

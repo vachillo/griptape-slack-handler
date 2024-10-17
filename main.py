@@ -25,7 +25,8 @@ if __name__ == "__main__":
     from griptape_slack_handler import handle_slack_event
 
     body, query, headers = sys.argv[1:4]
-    res = handle_slack_event(body, json.loads(headers))
+    ack_message_ts = sys.argv[4] if len(sys.argv) > 4 else None
+    res = handle_slack_event(body, json.loads(headers), ack_message_ts)
 
     if res["status"] >= 400:
         sys.exit(1)
