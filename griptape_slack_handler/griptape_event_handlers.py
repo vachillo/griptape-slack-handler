@@ -1,18 +1,32 @@
 from __future__ import annotations
 from typing import Optional
 import logging
+from attrs import define, field
 
 from griptape.events import (
+    BaseEvent,
     EventListener,
     StartStructureRunEvent,
     StartActionsSubtaskEvent,
     FinishActionsSubtaskEvent,
     CompletionChunkEvent,
 )
+from griptape.tools import BaseTool
 from .slack_event_listener_driver import SlackEventListenerDriver
 from .slack_util import thought_block, action_block, emoji_block
 
 logger = logging.getLogger()
+
+
+@define(kw_only=True)
+class ToolEvent(BaseEvent):
+    """An event for a tool.
+
+    Attributes:
+        tools: The tools to use for the event.
+    """
+
+    tools: list[BaseTool] = field()
 
 
 def event_listeners(*, stream: bool, **kwargs) -> list[EventListener]:
@@ -32,21 +46,63 @@ def event_listeners(*, stream: bool, **kwargs) -> list[EventListener]:
     driver = SlackEventListenerDriver(**kwargs)
     return [
         EventListener(
-            start_structure_handler,
-            event_types=[StartStructureRunEvent],
+            handler=handler,
             event_listener_driver=driver,
-        ),
-        EventListener(
-            start_actions_subtask_handler,
-            event_types=[StartActionsSubtaskEvent],
-            event_listener_driver=driver,
-        ),
-        EventListener(
-            finish_actions_subtask_handler,
-            event_types=[FinishActionsSubtaskEvent],
-            event_listener_driver=driver,
-        ),
+            event_types=[
+                StartStructureRunEvent,
+                StartActionsSubtaskEvent,
+                FinishActionsSubtaskEvent,
+                ToolEvent,
+            ],
+        )
     ]
+    # return [
+    #     EventListener(
+    #         start_structure_handler,
+    #         event_types=[StartStructureRunEvent],
+    #         event_listener_driver=driver,
+    #     ),
+    #     EventListener(
+    #         start_actions_subtask_handler,
+    #         event_types=[StartActionsSubtaskEvent],
+    #         event_listener_driver=driver,
+    #     ),
+    #     EventListener(
+    #         finish_actions_subtask_handler,
+    #         event_types=[FinishActionsSubtaskEvent],
+    #         event_listener_driver=driver,
+    #     ),
+    # ]
+
+
+def handler(
+    event: (
+        StartStructureRunEvent
+        | StartActionsSubtaskEvent
+        | FinishActionsSubtaskEvent
+        | ToolEvent
+    ),
+) -> Optional[dict]:
+    if isinstance(event, StartStructureRunEvent):
+        return start_structure_handler(event)
+    if isinstance(event, StartActionsSubtaskEvent):
+        return start_actions_subtask_handler(event)
+    if isinstance(event, FinishActionsSubtaskEvent):
+        return finish_actions_subtask_handler(event)
+    if isinstance(event, ToolEvent):
+        return tool_event_handler(event)
+    return None
+
+
+def tool_event_handler(event: ToolEvent) -> Optional[dict]:
+    return (
+        {
+            "text": "Tools",
+            "blocks": [action_block(f"I need the {tool.name}") for tool in event.tools],
+        }
+        if event.tools
+        else None
+    )
 
 
 def start_structure_handler(event: StartStructureRunEvent) -> Optional[dict]:

@@ -1,13 +1,15 @@
 from __future__ import annotations
 import logging
-from attrs import define, field
+from attrs import define, field, Factory
 from typing import TYPE_CHECKING
+import threading
 
+from griptape.events import BaseEvent
 from griptape.drivers import BaseEventListenerDriver
+from griptape.tools import BaseTool
 
 if TYPE_CHECKING:
     from slack_sdk import WebClient
-    from griptape.events import BaseEvent
 
 log = logging.getLogger()
 
@@ -29,47 +31,57 @@ class SlackEventListenerDriver(BaseEventListenerDriver):
     channel: str = field()
     batched: bool = field(default=False)
     _slack_responses: dict = field(factory=dict, init=False)
+    _thread_lock: threading.Lock = field(
+        default=Factory(lambda: threading.Lock()), alias="_thread_lock"
+    )
 
     def try_publish_event_payload_batch(self, event_payload_batch: list[dict]) -> None:
-        new_text = "".join([event.get("text", "") for event in event_payload_batch])
-        try:
-            self._slack_responses[self.ts] = self.web_client.chat_update(
-                text=self._slack_responses.get(self.ts, {}).get("text", "") + new_text,
-                ts=self.ts,
-                thread_ts=self.thread_ts,
-                channel=self.channel,
-            )
-        except Exception:
-            log.exception("Error updating message")
-            res = self.web_client.chat_postMessage(
-                text=new_text,
-                thread_ts=self.thread_ts,
-                channel=self.channel,
-            )
-            self._slack_responses[res["ts"]] = res
-            self.ts = res["ts"]
+        with self._thread_lock:
+            new_text = "".join([event.get("text", "") for event in event_payload_batch])
+            try:
+                res = self._slack_responses[self.ts] = self.web_client.chat_update(
+                    text=self._slack_responses.get(self.ts, {}).get("text", "")
+                    + new_text,
+                    ts=self.ts,
+                    thread_ts=self.thread_ts,
+                    channel=self.channel,
+                )
+                self._slack_responses[self.ts] = res
+            except Exception:
+                log.exception("Error updating message")
+                res = self.web_client.chat_postMessage(
+                    text=new_text,
+                    thread_ts=self.thread_ts,
+                    channel=self.channel,
+                )
+                self._slack_responses[res["ts"]] = res
+                self.ts = res["ts"]
 
     def try_publish_event_payload(self, event_payload: dict) -> None:
-        try:
-            if "blocks" in event_payload:
-                event_payload["blocks"] = (
-                    self._get_last_blocks() + event_payload["blocks"]
+        with self._thread_lock:
+            payload = {**event_payload}
+            try:
+                if "blocks" in event_payload:
+                    payload["blocks"] = (
+                        self._get_last_blocks() + event_payload["blocks"]
+                    )
+                res = self.web_client.chat_update(
+                    **payload,
+                    ts=self.ts,
+                    thread_ts=self.thread_ts,
+                    channel=self.channel,
                 )
-            self._slack_responses[self.ts] = self.web_client.chat_update(
-                **event_payload,
-                ts=self.ts,
-                thread_ts=self.thread_ts,
-                channel=self.channel,
-            )
-        except Exception:
-            log.exception("Error updating message")
-            res = self.web_client.chat_postMessage(
-                **event_payload,
-                thread_ts=self.thread_ts,
-                channel=self.channel,
-            )
-            self._slack_responses[res["ts"]] = res
-            self.ts = res["ts"]
+                self._slack_responses[res["ts"]] = res.data
+
+            except Exception:
+                log.exception("Error updating message")
+                res = self.web_client.chat_postMessage(
+                    **event_payload,
+                    thread_ts=self.thread_ts,
+                    channel=self.channel,
+                )
+                self._slack_responses[res["ts"]] = res.data
+                self.ts = res["ts"]
 
     def _get_last_blocks(self):
         return (

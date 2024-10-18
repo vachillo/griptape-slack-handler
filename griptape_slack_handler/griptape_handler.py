@@ -10,6 +10,8 @@ from griptape.rules import Ruleset
 from griptape.structures import Agent
 from griptape.memory.structure import ConversationMemory, Run
 
+from griptape_slack_handler.griptape_event_handlers import ToolEvent
+
 from .griptape_tool_box import get_tools
 from .griptape_config import load_griptape_config, set_thread_alias
 
@@ -69,6 +71,7 @@ def agent(
     set_thread_alias(thread_alias)
     tools = get_tools(message, dynamic=enable_toolbox)
     EventBus.add_event_listeners(event_listeners)
+    EventBus.publish_event(ToolEvent(tools=tools))
 
     agent = Agent(
         input="user_id '<@{{ args[0] }}>': {{ args[1] }}",
