@@ -49,11 +49,12 @@ def respond_in_thread(body: dict, payload: dict, say: Say, client: WebClient):
     team_id = body["team_id"]
     app_id = body["api_app_id"]
     thread_ts = payload.get("thread_ts", payload["ts"])
-    thinking_res = say(
+    ts = say(
         **thinking_payload(),
         thread_ts=thread_ts,
-    )
-    ts = thinking_res["ts"]
+    )["ts"]
+
+    stream = False
 
     try:
         rulesets = get_rulesets(
