@@ -1,12 +1,14 @@
 from __future__ import annotations
 
+import json
 from typing import Optional, TYPE_CHECKING
 import logging
 import re
+from schema import Schema, Literal
 
 from griptape.events import EventBus
 from griptape.artifacts import ErrorArtifact, TextArtifact
-from griptape.rules import Ruleset
+from griptape.rules import Ruleset, Rule, JsonSchemaRule
 from griptape.structures import Agent
 from griptape.memory.structure import ConversationMemory, Run
 
@@ -78,7 +80,9 @@ def agent(
     )
     tools = get_tools(message, dynamic=dynamic_tools)
     EventBus.add_event_listeners(event_listeners)
-    EventBus.publish_event(ToolEvent(tools=tools, stream=stream), flush=True)
+
+    if dynamic_tools:
+        EventBus.publish_event(ToolEvent(tools=tools, stream=stream), flush=True)
 
     agent = Agent(
         input="user_id '<@{{ args[0] }}>': {{ args[1] }}",
@@ -90,3 +94,32 @@ def agent(
     if isinstance(output, ErrorArtifact):
         raise ValueError(output.to_text())
     return output.to_text()
+
+
+def is_relevant_response(message: str, response: str) -> bool:
+    agent = Agent(
+        input="Given the following message: '{{ args[0] }}', is the following response helpful and relevant? Response: {{ args[1] }}",
+        rulesets=[
+            Ruleset(
+                rules=[
+                    Rule("Only respond 'true' if you are confident"),
+                    JsonSchemaRule(
+                        Schema(
+                            {
+                                Literal(
+                                    "is_relevant_response",
+                                    description="Boolean value that determines if the given response is relevant to the given message.",
+                                ): bool
+                            }
+                        ).json_schema("is_relevant_response")
+                    ),
+                ]
+            )
+        ],
+        stream=False,
+    )
+
+    output = agent.run(message, response).output
+    if isinstance(output, ErrorArtifact):
+        raise ValueError(output.to_text())
+    return json.loads(output.to_text())["is_relevant_response"]

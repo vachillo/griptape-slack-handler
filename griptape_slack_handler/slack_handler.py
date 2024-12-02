@@ -8,7 +8,12 @@ from .slack_util import (
     thinking_payload,
     markdown_blocks_list,
 )
-from .griptape_handler import agent, get_rulesets, try_add_to_thread
+from .griptape_handler import (
+    agent,
+    get_rulesets,
+    try_add_to_thread,
+    is_relevant_response,
+)
 from .griptape_event_handlers import event_listeners
 from .features import (
     persist_thoughts_enabled,
@@ -25,6 +30,8 @@ app: App = App(
     process_before_response=True,  # required
 )
 
+SHADOW_USER_ID = os.environ.get("SHADOW_USER_ID")
+
 ### Slack Event Handlers ###
 
 
@@ -34,6 +41,9 @@ def message(body: dict, payload: dict, say: Say, client: WebClient):
     # will respond to every message in every channel it is in
     if payload.get("channel_type") == "im":
         respond_in_thread(body, payload, say, client)
+    # if the message body @ mentions the shadow user, then call the shadow_resopnse function
+    elif SHADOW_USER_ID is not None and SHADOW_USER_ID in payload.get("text", ""):
+        shadow_respond_in_thread(body, payload, say, client)
     elif payload.get("subtype") != "bot_message" and thread_history_enabled():
         # add the message to the cloud thread
         # so the bot can use it for context when
@@ -48,6 +58,64 @@ def message(body: dict, payload: dict, say: Say, client: WebClient):
 @app.event("app_mention")
 def app_mention(body: dict, payload: dict, say: Say, client: WebClient):
     respond_in_thread(body, payload, say, client)
+
+
+def shadow_respond_in_thread(body: dict, payload: dict, say: Say, client: WebClient):
+    thread_ts = payload.get("thread_ts", payload["ts"])
+    ts = say(
+        **thinking_payload(),
+        thread_ts=thread_ts,
+    )["ts"]
+
+    stream = stream_output_enabled()
+
+    try:
+        rulesets = get_rulesets(
+            user_id=payload["user"],
+            channel_id=payload["channel"],
+            team_id=body["team_id"],
+            app_id=body["api_app_id"],
+        )
+        # wip, if any rulesets have stream=True, then stream the response
+        # changes the slack app behavior. any truthy value will work
+        stream = stream or any(
+            [ruleset.meta.get("stream", False) for ruleset in rulesets]
+        )
+
+        agent_output = agent(
+            payload["text"],
+            thread_alias=thread_ts,
+            user_id=payload["user"],
+            rulesets=rulesets,
+            event_listeners=event_listeners(
+                stream=stream,
+                web_client=client,
+                ts=ts,
+                thread_ts=thread_ts,
+                channel=payload["channel"],
+            ),
+            stream=stream,
+        )
+    except Exception as e:
+        logger.exception("Error while processing response")
+        return
+
+    if is_relevant_response(payload["text"], agent_output):
+        for i, blocks in enumerate(markdown_blocks_list(agent_output)):
+            if i == 0 and not persist_thoughts_enabled():
+                client.chat_update(
+                    text=agent_output,
+                    blocks=blocks,
+                    ts=ts,
+                    channel=payload["channel"],
+                )
+            else:
+                client.chat_postMessage(
+                    text=agent_output,
+                    blocks=blocks,
+                    thread_ts=thread_ts,
+                    channel=payload["channel"],
+                )
 
 
 def respond_in_thread(body: dict, payload: dict, say: Say, client: WebClient):
