@@ -62,12 +62,6 @@ def app_mention(body: dict, payload: dict, say: Say, client: WebClient):
 
 def shadow_respond_in_thread(body: dict, payload: dict, say: Say, client: WebClient):
     thread_ts = payload.get("thread_ts", payload["ts"])
-    ts = say(
-        **thinking_payload(),
-        thread_ts=thread_ts,
-    )["ts"]
-
-    stream = stream_output_enabled()
 
     try:
         rulesets = get_rulesets(
@@ -76,46 +70,30 @@ def shadow_respond_in_thread(body: dict, payload: dict, say: Say, client: WebCli
             team_id=body["team_id"],
             app_id=body["api_app_id"],
         )
-        # wip, if any rulesets have stream=True, then stream the response
-        # changes the slack app behavior. any truthy value will work
-        stream = stream or any(
-            [ruleset.meta.get("stream", False) for ruleset in rulesets]
-        )
 
         agent_output = agent(
             payload["text"],
             thread_alias=thread_ts,
             user_id=payload["user"],
             rulesets=rulesets,
-            event_listeners=event_listeners(
-                stream=stream,
-                web_client=client,
-                ts=ts,
-                thread_ts=thread_ts,
-                channel=payload["channel"],
-            ),
-            stream=stream,
+            event_listeners=[],
+            stream=False,
         )
     except Exception as e:
         logger.exception("Error while processing response")
         return
 
     if is_relevant_response(payload["text"], agent_output):
-        for i, blocks in enumerate(markdown_blocks_list(agent_output)):
-            if i == 0 and not persist_thoughts_enabled():
-                client.chat_update(
-                    text=agent_output,
-                    blocks=blocks,
-                    ts=ts,
-                    channel=payload["channel"],
-                )
-            else:
-                client.chat_postMessage(
-                    text=agent_output,
-                    blocks=blocks,
-                    thread_ts=thread_ts,
-                    channel=payload["channel"],
-                )
+        logger.info("Shadow response is relevant, sending")
+        for blocks in markdown_blocks_list(agent_output):
+            client.chat_postMessage(
+                text=agent_output,
+                blocks=blocks,
+                thread_ts=thread_ts,
+                channel=payload["channel"],
+            )
+    else:
+        logger.info("Shadow response not relevant, not sending")
 
 
 def respond_in_thread(body: dict, payload: dict, say: Say, client: WebClient):
