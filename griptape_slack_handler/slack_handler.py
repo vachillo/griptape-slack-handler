@@ -11,6 +11,7 @@ from .slack_util import (
 from .griptape_handler import (
     agent,
     get_rulesets,
+    get_tool_names,
     try_add_to_thread,
     is_relevant_response,
 )
@@ -19,6 +20,7 @@ from .features import (
     persist_thoughts_enabled,
     stream_output_enabled,
     thread_history_enabled,
+    shadow_user_enabled,
 )
 
 logger = logging.getLogger()
@@ -28,6 +30,7 @@ app: App = App(
     signing_secret=os.environ.get("SLACK_SIGNING_SECRET"),
     logger=logger,
     process_before_response=True,  # required
+    request_verification_enabled=False,  # required
 )
 
 SHADOW_USER_ID = os.environ.get("SHADOW_USER_ID")
@@ -42,7 +45,7 @@ def message(body: dict, payload: dict, say: Say, client: WebClient):
     if payload.get("channel_type") == "im":
         respond_in_thread(body, payload, say, client)
     # if the message body @ mentions the shadow user, then call the shadow_resopnse function
-    elif SHADOW_USER_ID is not None and SHADOW_USER_ID in payload.get("text", ""):
+    elif shadow_user_enabled() and SHADOW_USER_ID is not None and SHADOW_USER_ID in payload.get("text", ""):
         shadow_respond_in_thread(body, payload, say, client)
     elif payload.get("subtype") != "bot_message" and thread_history_enabled():
         # add the message to the cloud thread
@@ -71,6 +74,13 @@ def shadow_respond_in_thread(body: dict, payload: dict, say: Say, client: WebCli
             app_id=body["api_app_id"],
         )
 
+        tool_names = get_tool_names(
+            user_id=payload["user"],
+            channel_id=payload["channel"],
+            team_id=body["team_id"],
+            app_id=body["api_app_id"],
+        )
+
         agent_output = agent(
             payload["text"],
             thread_alias=thread_ts,
@@ -78,12 +88,17 @@ def shadow_respond_in_thread(body: dict, payload: dict, say: Say, client: WebCli
             rulesets=rulesets,
             event_listeners=[],
             stream=False,
+            tool_names=tool_names,
         )
     except Exception as e:
         logger.exception("Error while processing response")
         return
 
-    if is_relevant_response(payload["text"], agent_output):
+    if is_relevant_response(
+        payload["text"],
+        agent_output,
+        rulesets=get_rulesets(shadow_app_ruleset=f"{body['api_app_id']}|shadow"),
+    ):
         logger.info("Shadow response is relevant, sending")
         for blocks in markdown_blocks_list(agent_output):
             client.chat_postMessage(

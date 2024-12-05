@@ -38,6 +38,20 @@ def thread_history_enabled() -> bool:
     return get_feature("THREAD_HISTORY", True)
 
 
+def shadow_user_enabled() -> bool:
+    """
+    Whether the shadow user is enabled. Defaults to False
+    """
+    return get_feature("SHADOW_USER", True)
+
+
+def shadow_user_always_respond_enabled() -> bool:
+    """
+    Whether the shadow user will always respond to messages that mention it. Defaults to False
+    """
+    return get_feature("SHADOW_USER_ALWAYS_RESPOND", False)
+
+
 def get_feature(feature: str, default: bool) -> bool:
     """
     Gets a feature from the environment.
