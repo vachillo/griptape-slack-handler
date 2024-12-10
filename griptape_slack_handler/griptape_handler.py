@@ -7,6 +7,7 @@ import re
 from schema import Schema, Literal
 
 from griptape.events import EventBus
+from griptape.drivers import GriptapeCloudRulesetDriver
 from griptape.artifacts import ErrorArtifact, TextArtifact
 from griptape.rules import Ruleset, Rule, JsonSchemaRule
 from griptape.structures import Agent
@@ -16,7 +17,7 @@ from griptape_slack_handler.griptape_event_handlers import ToolEvent
 
 from .griptape_tool_box import get_tools
 from .griptape_config import load_griptape_config, set_thread_alias
-from .features import dynamic_rulesets_enabled, dynamic_tools_enabled
+from .features import dynamic_rulesets_enabled, dynamic_tools_enabled, shadow_user_always_respond_enabled
 
 if TYPE_CHECKING:
     from griptape.events import EventListener
@@ -57,6 +58,15 @@ def try_add_to_thread(
     )
 
 
+def get_tool_names(**kwargs) -> list[str]:
+    tools = set()
+    for ruleset in get_rulesets(**kwargs):
+        if "tool_names" in ruleset.meta:
+            tools.update(ruleset.meta["tool_names"])
+
+    return list(tools)
+
+
 def get_rulesets(**kwargs) -> list[Ruleset]:
     return (
         [Ruleset(name=value) for value in kwargs.values()]
@@ -69,6 +79,7 @@ def agent(
     message: str,
     *,
     thread_alias: Optional[str] = None,
+    tool_names: list[str] = [],
     user_id: str,
     rulesets: list[Ruleset],
     event_listeners: list[EventListener],
@@ -78,7 +89,7 @@ def agent(
     dynamic_tools = dynamic_tools_enabled() or any(
         [ruleset.meta.get("dynamic_tools", False) for ruleset in rulesets]
     )
-    tools = get_tools(message, dynamic=dynamic_tools)
+    tools = get_tools(message, dynamic=dynamic_tools, tool_names=tool_names)
     EventBus.add_event_listeners(event_listeners)
 
     if dynamic_tools:
@@ -96,30 +107,18 @@ def agent(
     return output.to_text()
 
 
-def is_relevant_response(message: str, response: str) -> bool:
+def is_relevant_response(
+    message: str, response: str, *, rulesets: list[Ruleset] = []
+) -> bool:
+    if shadow_user_always_respond_enabled():
+        return True
     agent = Agent(
-        input="Given the following message: '{{ args[0] }}', is the following response helpful and relevant? Response: {{ args[1] }}",
-        rulesets=[
-            Ruleset(
-                rules=[
-                    Rule("Only respond 'true' if you are confident"),
-                    JsonSchemaRule(
-                        Schema(
-                            {
-                                Literal(
-                                    "is_relevant_response",
-                                    description="Boolean value that determines if the given response is relevant to the given message.",
-                                ): bool
-                            }
-                        ).json_schema("is_relevant_response")
-                    ),
-                ]
-            )
-        ],
+        input="Given the following message: '{{ args[0] }}', should the following response be sent to the user? Response: {{ args[1] }}",
+        rulesets=rulesets,
         stream=False,
     )
 
     output = agent.run(message, response).output
     if isinstance(output, ErrorArtifact):
         raise ValueError(output.to_text())
-    return json.loads(output.to_text())["is_relevant_response"]
+    return json.loads(output.to_text())["should_respond"]
