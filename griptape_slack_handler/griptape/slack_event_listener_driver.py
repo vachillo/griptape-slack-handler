@@ -61,6 +61,14 @@ class SlackEventListenerDriver(BaseEventListenerDriver):
         with self._thread_lock:
             payload = {**event_payload}
             try:
+                if event_payload.pop("new_message", False):
+                    res = self.web_client.chat_postMessage(
+                        **payload,
+                        thread_ts=self.thread_ts,
+                        channel=self.channel,
+                    )
+                    return
+
                 if "blocks" in event_payload:
                     payload["blocks"] = (
                         self._get_last_blocks() + event_payload["blocks"]

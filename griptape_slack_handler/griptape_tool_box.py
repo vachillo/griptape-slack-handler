@@ -6,7 +6,6 @@ from griptape.tools import (
     BaseTool,
     WebScraperTool,
     WebSearchTool,
-    GriptapeCloudKnowledgeBaseTool,
 )
 from griptape.drivers import TrafilaturaWebScraperDriver, DuckDuckGoWebSearchDriver
 from griptape.loaders import WebLoader
@@ -15,18 +14,26 @@ from griptape.tasks import PromptTask
 from griptape.rules import Rule
 
 from .griptape.read_only_conversation_memory import ReadOnlyConversationMemory
+from .griptape.giphy_tool import GiphyTool
 
 logger = logging.getLogger()
 
 
-def get_tools(message: str, *, dynamic: bool = False) -> list[BaseTool]:
+def get_tools(message: str, *, dynamic: bool = False, tool_names: list[str]) -> list[BaseTool]:
     """
     Gets tools for the Agent to use. if dynamic=True, the LLM will decide what tools to use
     based on the user input and the conversation history.
     """
     tools_dict = _init_tools_dict()
     if not dynamic:
-        return [tool for tool, _ in tools_dict.values()]
+        logger.debug("Using static tools.")
+        if not tool_names:
+            logger.debug("No tool names provided. Using all tools.")
+            return [tool for tool, _ in tools_dict.values()]
+        logger.debug(f"Using tools: {tool_names}")
+        return [tools_dict[tool_name][0] for tool_name in tool_names if tool_name in tools_dict]
+    
+    logger.debug("Using dynamic tools.")
 
     tools_descriptions = {k: description for k, (_, description) in tools_dict.items()}
 
@@ -59,11 +66,6 @@ def _init_tools_dict() -> dict[str, tuple[BaseTool, str]]:
     and the value is a tuple containing the Tool object and a description
     of what the tool can do
     """
-    # TODO: Add other tools here
-    knowledge_base_tool = GriptapeCloudKnowledgeBaseTool(
-        api_key=os.getenv("GT_CLOUD_API_KEY", ""),
-        knowledge_base_id=os.getenv("GT_CLOUD_KNOWLEDGE_BASE_ID", ""),
-    )
     return {
         "web_scraper": (
             WebScraperTool(
@@ -77,8 +79,10 @@ def _init_tools_dict() -> dict[str, tuple[BaseTool, str]]:
             ),
             "Can be used to search the web for information. Should be used with web_scraper.",
         ),
-        "knowledge_base_tool": (
-            knowledge_base_tool,
-            knowledge_base_tool._get_knowledge_base_description(),
+        "giphy": (
+            GiphyTool(
+                api_key=os.environ["GIPHY_API_KEY"],
+            ),
+            "Can be used to search for gifs.",
         ),
     }

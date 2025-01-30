@@ -16,6 +16,7 @@ from griptape.events import (
 )
 
 from .griptape.tool_event import ToolEvent
+from .griptape.giphy_event import GiphyEvent
 from .griptape.slack_event_listener_driver import SlackEventListenerDriver
 from .slack_util import thought_block, action_block, emoji_block
 
@@ -46,6 +47,7 @@ def event_listeners(*, stream: bool, **kwargs) -> list[EventListener]:
             handler,
             event_types=[
                 ToolEvent,
+                GiphyEvent,
                 StartStructureRunEvent,
                 StartActionsSubtaskEvent,
                 FinishActionsSubtaskEvent,
@@ -58,6 +60,8 @@ def event_listeners(*, stream: bool, **kwargs) -> list[EventListener]:
 def handler(event: BaseEvent) -> Optional[dict]:
     if isinstance(event, ToolEvent):
         return tool_event_handler(event)
+    if isinstance(event, GiphyEvent):
+        return giphy_event_handler(event)
     if isinstance(event, StartStructureRunEvent):
         return start_structure_handler(event)
     if isinstance(event, StartActionsSubtaskEvent):
@@ -84,6 +88,21 @@ def tool_event_handler(event: ToolEvent) -> Optional[dict]:
             "text": "Tools",
             "blocks": [action_block(f"I need the {tool.name}") for tool in event.tools],
         }
+
+
+def giphy_event_handler(event: GiphyEvent) -> Optional[dict]:
+    return {
+        "text": event.tag,
+        "blocks": [
+            {
+                "type": "image",
+                "title": {"type": "plain_text", "text": event.title},
+                "image_url": event.url,
+                "alt_text": event.title,
+            }
+        ],
+        "new_message": True,
+    }
 
 
 def start_structure_handler(event: StartStructureRunEvent) -> Optional[dict]:
