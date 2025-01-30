@@ -1,5 +1,5 @@
 import logging
-import os
+import asyncio
 
 from griptape.memory.structure.base_conversation_memory import BaseConversationMemory
 from griptape.tools import (
@@ -12,18 +12,20 @@ from griptape.loaders import WebLoader
 from griptape.structures import Agent
 from griptape.tasks import PromptTask
 from griptape.rules import Rule
+from griptape.artifacts import TextArtifact
 
 from .griptape.read_only_conversation_memory import ReadOnlyConversationMemory
+from .async_util import to_async
 
 logger = logging.getLogger()
 
 
-def get_tools(message: str, *, dynamic: bool = False) -> list[BaseTool]:
+async def get_tools(message: str, *, dynamic: bool = False) -> list[BaseTool]:
     """
     Gets tools for the Agent to use. if dynamic=True, the LLM will decide what tools to use
     based on the user input and the conversation history.
     """
-    tools_dict = _init_tools_dict()
+    tools_dict = await _init_tools_dict()
     if not dynamic:
         return [tool for tool, _ in tools_dict.values()]
 
@@ -45,13 +47,14 @@ def get_tools(message: str, *, dynamic: bool = False) -> list[BaseTool]:
         ],
         conversation_memory=ReadOnlyConversationMemory(),
     )
-    output = agent.run(message, tools_descriptions).output.value
+    output = (await to_async(agent.run, message, tools_descriptions)).output.value
+
     tool_names = output.split(",") if output != "None" else []
     logger.info(f"Tools needed: {tool_names}")
     return [tools_dict[tool_name.strip()][0] for tool_name in tool_names]
 
 
-def _init_tools_dict() -> dict[str, tuple[BaseTool, str]]:
+async def _init_tools_dict() -> dict[str, tuple[BaseTool, str]]:
     """
     Initializes the tools dictionary.
     The return value is a dictionary where the key is the tool name
@@ -60,14 +63,20 @@ def _init_tools_dict() -> dict[str, tuple[BaseTool, str]]:
     """
     return {
         "web_scraper": (
-            WebScraperTool(
-                web_loader=WebLoader(web_scraper_driver=TrafilaturaWebScraperDriver()),
+            await to_async(
+                lambda: WebScraperTool(
+                    web_loader=WebLoader(
+                        web_scraper_driver=TrafilaturaWebScraperDriver()
+                    )
+                )
             ),
             "Can be used find information on a web page. Should be used with web_search.",
         ),
         "web_search": (
-            WebSearchTool(
-                web_search_driver=DuckDuckGoWebSearchDriver(),
+            await to_async(
+                lambda: WebSearchTool(
+                    web_search_driver=DuckDuckGoWebSearchDriver(),
+                )
             ),
             "Can be used to search the web for information. Should be used with web_scraper.",
         ),
