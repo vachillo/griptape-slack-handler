@@ -32,7 +32,7 @@ class SlackEventListenerDriver(BaseEventListenerDriver):
     ts: Optional[str] = field(default=None)
     thread_ts: str = field()
     channel: str = field()
-    disable_blocks: bool = field(default=False)
+    typing_message: bool = field(default=False)
     batched: bool = field(default=False)
 
     _slack_responses: dict = field(factory=dict, init=False)
@@ -74,7 +74,7 @@ class SlackEventListenerDriver(BaseEventListenerDriver):
         with self._thread_lock:
             payload = {**event_payload}
             try:
-                if "blocks" in event_payload and not self.disable_blocks:
+                if "blocks" in event_payload and not self.typing_message:
                     payload["blocks"] = (
                         self._get_last_blocks() + event_payload["blocks"]
                     )

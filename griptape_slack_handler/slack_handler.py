@@ -21,6 +21,7 @@ from .features import (
     thread_history_enabled,
     shadow_user_enabled,
     shadow_user_always_respond_enabled,
+    assistant_typing_message_enabled,
 )
 
 logger = logging.getLogger("griptape_slack_handler")
@@ -96,7 +97,7 @@ def shadow_respond_in_thread(body: dict, payload: dict, client: WebClient):
                 web_client=client,
                 thread_ts=thread_ts,
                 channel=payload["channel"],
-                disable_blocks=True,
+                typing_message=assistant_typing_message_enabled(),
             ),
             stream=False,
         )
@@ -148,7 +149,7 @@ def respond_in_thread(body: dict, payload: dict, client: WebClient):
                 web_client=client,
                 thread_ts=thread_ts,
                 channel=payload["channel"],
-                disable_blocks=True,
+                typing_message=assistant_typing_message_enabled(),
             ),
             stream=stream,
         )

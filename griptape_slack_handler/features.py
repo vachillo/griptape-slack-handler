@@ -15,6 +15,13 @@ def shadow_user_always_respond_enabled() -> bool:
     return get_feature("SHADOW_USER_ALWAYS_RESPOND", False)
 
 
+def assistant_typing_message_enabled() -> bool:
+    """
+    Whether the slackbot will update the typing status when responding. Defaults to True.
+    """
+    return get_feature("ASSISTANT_TYPING_MESSAGE", True)
+
+
 def stream_output_enabled() -> bool:
     """
     Whether the response will be streamed. Defaults to False
