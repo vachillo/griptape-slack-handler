@@ -23,7 +23,7 @@ from .features import (
     shadow_user_always_respond_enabled,
 )
 
-logger = logging.getLogger()
+logger = logging.getLogger("griptape_slack_handler")
 
 app: App = App(
     token=os.environ.get("SLACK_BOT_TOKEN"),
@@ -39,9 +39,11 @@ SHADOW_USER_ID = os.environ.get("SHADOW_USER_ID")
 
 @app.event("message")
 def message(body: dict, payload: dict, client: WebClient):
+    logger.debug(f"Handling message event type: {payload.get('subtype')}")
     # only respond to direct messages, otherwise the bot
     # will respond to every message in every channel it is in
     if payload.get("channel_type") == "im":
+        logger.debug("Responding to direct message")
         respond_in_thread(body, payload, client)
     # if the message body @ mentions the shadow user, then call the shadow_resopnse function
     elif (
@@ -49,8 +51,10 @@ def message(body: dict, payload: dict, client: WebClient):
         and SHADOW_USER_ID is not None
         and SHADOW_USER_ID in payload.get("text", "")
     ):
+        logger.debug("Shadow user mentioned")
         shadow_respond_in_thread(body, payload, client)
     elif payload.get("subtype") != "bot_message" and thread_history_enabled():
+        logger.debug("Adding message to thread without responding")
         # add the message to the cloud thread
         # so the bot can use it for context when
         # responding to future messages in a thread
@@ -63,6 +67,7 @@ def message(body: dict, payload: dict, client: WebClient):
 
 @app.event("app_mention")
 def app_mention(body: dict, payload: dict, client: WebClient):
+    logger.debug("Handling app_mention event")
     respond_in_thread(body, payload, client)
 
 
@@ -75,6 +80,10 @@ def shadow_respond_in_thread(body: dict, payload: dict, client: WebClient):
             channel_id=payload["channel"],
             team_id=body["team_id"],
             app_id=body["api_app_id"],
+        )
+        logger.debug(f"Loaded {len(rulesets)} rulesets")
+        logger.debug(
+            f"Rulesets names: {', '.join([ruleset.name for ruleset in rulesets])}"
         )
 
         agent_output = agent(
@@ -98,7 +107,7 @@ def shadow_respond_in_thread(body: dict, payload: dict, client: WebClient):
     if shadow_user_always_respond_enabled() and is_relevant_response(
         payload["text"], agent_output
     ):
-        logger.info("Shadow response is relevant, sending")
+        logger.debug("Shadow response is relevant, sending")
         send_message_blocks(
             agent_output,
             thread_ts=thread_ts,
@@ -106,7 +115,7 @@ def shadow_respond_in_thread(body: dict, payload: dict, client: WebClient):
             client=client,
         )
     else:
-        logger.info("Shadow response not relevant, not sending")
+        logger.debug("Shadow response not relevant, not sending")
         typing_message(thread_ts=thread_ts, channel=payload["channel"], client=client)
 
 
@@ -123,6 +132,10 @@ def respond_in_thread(body: dict, payload: dict, client: WebClient):
             channel_id=payload["channel"],
             team_id=team_id,
             app_id=app_id,
+        )
+        logger.debug(f"Loaded {len(rulesets)} rulesets")
+        logger.debug(
+            f"Rulesets names: {', '.join([ruleset.name for ruleset in rulesets])}"
         )
 
         agent_output = agent(
@@ -151,6 +164,7 @@ def respond_in_thread(body: dict, payload: dict, client: WebClient):
 
     # Assuming that the response is already sent if its being streamed
     if not stream:
+        logger.debug("Sending response")
         send_message_blocks(
             agent_output,
             thread_ts=thread_ts,

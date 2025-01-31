@@ -6,6 +6,7 @@ from griptape.tools import (
     BaseTool,
     WebScraperTool,
     WebSearchTool,
+    DateTimeTool,
 )
 from griptape.drivers import TrafilaturaWebScraperDriver, DuckDuckGoWebSearchDriver
 from griptape.loaders import WebLoader
@@ -15,7 +16,7 @@ from griptape.rules import Rule
 
 from .griptape.read_only_conversation_memory import ReadOnlyConversationMemory
 
-logger = logging.getLogger()
+logger = logging.getLogger("griptape_slack_handler")
 
 
 def get_tools(message: str, *, dynamic: bool = False) -> list[BaseTool]:
@@ -29,6 +30,7 @@ def get_tools(message: str, *, dynamic: bool = False) -> list[BaseTool]:
 
     tools_descriptions = {k: description for k, (_, description) in tools_dict.items()}
 
+    # TODO: Use EvalEngine to determine which tools to use
     agent = Agent(
         tasks=[
             PromptTask(
@@ -47,7 +49,6 @@ def get_tools(message: str, *, dynamic: bool = False) -> list[BaseTool]:
     )
     output = agent.run(message, tools_descriptions).output.value
     tool_names = output.split(",") if output != "None" else []
-    logger.info(f"Tools needed: {tool_names}")
     return [tools_dict[tool_name.strip()][0] for tool_name in tool_names]
 
 
@@ -70,5 +71,9 @@ def _init_tools_dict() -> dict[str, tuple[BaseTool, str]]:
                 web_search_driver=DuckDuckGoWebSearchDriver(),
             ),
             "Can be used to search the web for information. Should be used with web_scraper.",
+        ),
+        "datetime": (
+            DateTimeTool(),
+            "Can be used to find the current date and time.",
         ),
     }

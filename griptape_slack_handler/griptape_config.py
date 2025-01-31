@@ -1,11 +1,27 @@
 import os
+import logging
 from typing import Optional
+import rich.logging
+import logging
 
 from griptape.configs import Defaults
 from griptape.configs.drivers import AzureOpenAiDriversConfig
 from griptape.drivers import (
     GriptapeCloudConversationMemoryDriver,
     GriptapeCloudRulesetDriver,
+)
+
+logging.basicConfig(
+    level=logging.WARNING,
+    format="%(message)s",
+    handlers=[rich.logging.RichHandler()],
+    force=True,
+)
+
+# Set desired logging level for
+logging.getLogger("griptape").setLevel(os.environ.get("LOG_LEVEL", logging.INFO))
+logging.getLogger("griptape_slack_handler").setLevel(
+    os.environ.get("LOG_LEVEL", logging.INFO)
 )
 
 

@@ -19,7 +19,7 @@ from .griptape.tool_event import ToolEvent
 from .griptape.slack_event_listener_driver import SlackEventListenerDriver
 from .slack_util import thought_block, action_block, emoji_block
 
-logger = logging.getLogger()
+logger = logging.getLogger("griptape_slack_handler")
 
 
 def event_listeners(*, stream: bool, **kwargs) -> list[EventListener]:

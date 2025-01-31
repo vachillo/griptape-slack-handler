@@ -11,6 +11,7 @@ from griptape.artifacts import ErrorArtifact, TextArtifact
 from griptape.rules import Ruleset, Rule, JsonSchemaRule
 from griptape.structures import Agent
 from griptape.memory.structure import ConversationMemory, Run
+from griptape.engines import EvalEngine
 
 from griptape_slack_handler.griptape_event_handlers import ToolEvent
 
@@ -22,7 +23,7 @@ if TYPE_CHECKING:
     from griptape.events import EventListener
 
 
-logger = logging.getLogger()
+logger = logging.getLogger("griptape_slack_handler")
 
 
 load_griptape_config()
@@ -75,21 +76,26 @@ def agent(
     stream: bool,
 ) -> str:
     set_thread_alias(thread_alias)
+    logger.debug(f"Setting thread alias to: {thread_alias}")
     EventBus.add_event_listeners(event_listeners)
 
     if dynamic_tools_enabled():
+        logger.debug("Dynamic tools enabled")
         EventBus.publish_event(ToolEvent(tools=[], stream=stream), flush=True)
         tools = get_tools(message, dynamic=True)
         EventBus.publish_event(ToolEvent(tools=tools, stream=stream), flush=True)
     else:
         tools = get_tools(message, dynamic=False)
 
+    logger.debug(f"Tools used for request: {', '.join([tool.name for tool in tools])}")
+
     agent = Agent(
         tools=tools,
         rulesets=rulesets,
         rules=[
+            Rule(f"Slack user '{user_id}' has sent this message."),
             Rule(
-                f"You are responding to user '{user_id}'. Your input is this user's message. You can respond to the user with this syntax: '<@{user_id}>'"
+                "You can respond to any Slack user with this syntax: <@user_id>, replace 'user_id' with the user's Slack Id."
             ),
         ],
         stream=stream,
@@ -102,6 +108,7 @@ def agent(
 
 def is_relevant_response(message: str, response: str) -> bool:
     # TODO: implment with EvalEngine
+    eval_engine = EvalEngine()
 
     agent = Agent(
         input="Given the following message: '{{ args[0] }}', is the following response helpful and relevant? Response: {{ args[1] }}",

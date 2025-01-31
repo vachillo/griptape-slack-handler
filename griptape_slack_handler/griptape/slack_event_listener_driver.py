@@ -13,7 +13,7 @@ from ..slack_util import typing_message
 if TYPE_CHECKING:
     from slack_sdk import WebClient
 
-log = logging.getLogger()
+log = logging.getLogger("griptape_slack_handler")
 
 
 @define(kw_only=True)
