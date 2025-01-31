@@ -81,14 +81,14 @@ def tool_event_handler(event: ToolEvent) -> Optional[dict]:
         }
     else:
         return {
-            "text": "Tools",
+            "text": f"is gathering the tool{'s' if len(event.tools) > 1 or not event.tools else ''} {', '.join([tool.name for tool in event.tools])}...",
             "blocks": [action_block(f"I need the {tool.name}") for tool in event.tools],
         }
 
 
 def start_structure_handler(event: StartStructureRunEvent) -> Optional[dict]:
     return {
-        "text": "Starting...",
+        "text": "is reading the data...",
         "blocks": [emoji_block(":envelope:", "Reading the data...")],
     }
 
@@ -97,9 +97,11 @@ def start_actions_subtask_handler(event: StartActionsSubtaskEvent) -> Optional[d
     if event.subtask_actions is None:
         return None
     blocks = []
+    action_names = []
     if event.subtask_thought is not None:
         blocks.append(thought_block(event.subtask_thought))
     for action in event.subtask_actions:
+        action_names.append(f"{action['name']}.{action['path']}")
         action_input = "\n".join(
             [f"*{key}*: _{value}_ " for key, value in action["input"]["values"].items()]
         )
@@ -110,12 +112,15 @@ def start_actions_subtask_handler(event: StartActionsSubtaskEvent) -> Optional[d
             )
         )
 
-    return {"blocks": blocks, "text": "Thought..."}
+    return {
+        "blocks": blocks,
+        "text": f"is performing actions {', '.join(action_names)} on the data...",
+    }
 
 
 def finish_actions_subtask_handler(event: FinishActionsSubtaskEvent) -> Optional[dict]:
     return {
-        "text": "Finishing...",
+        "text": "is analyzing the data...",
         "blocks": [emoji_block(":pencil:", "Analyzing the data...")],
     }
 

@@ -1,4 +1,11 @@
-from typing import Generator
+from __future__ import annotations
+
+from typing import Generator, TYPE_CHECKING
+
+
+if TYPE_CHECKING:
+    from slack_sdk import WebClient
+
 
 SLACK_MAX_BLOCK_CHARS = 3000
 SLACK_MAX_TEXT_CHARACTERS = 40_000
@@ -7,6 +14,47 @@ SLACK_MAX_BLOCKS = 50
 LOADERS_URL = "https://dim8ibqgp8o75.cloudfront.net"
 ERROR_PNG = f"{LOADERS_URL}/error.png"
 THINKING_GIF = f"{LOADERS_URL}/thinking.gif"
+
+
+## Helper methods ##
+def typing_message(
+    message: str = "", *, thread_ts: str, channel: str, client: WebClient
+) -> None:
+    """Sets the message of the Assistant in the spot where you see 'user is typing...' in Slack. Typically it should start with 'is'. Defaults to an empty string to clear the message."""
+    client.assistant_threads_setStatus(
+        thread_ts=thread_ts,
+        status=message,
+        channel_id=channel,
+    )
+
+
+def send_message_blocks(
+    message: str, *, thread_ts: str, channel: str, client: WebClient
+) -> None:
+    """Sends a message to the channel. Block formatted messages are split into multiple messages if they exceed the block limit."""
+    for blocks in markdown_blocks_list(message):
+        send_message(
+            blocks, message, thread_ts=thread_ts, channel=channel, client=client
+        )
+
+
+def send_message(
+    blocks: list[dict],
+    text: str,
+    *,
+    thread_ts: str,
+    channel: str,
+    client: WebClient,
+    **kwargs,
+) -> None:
+    """Sends a message to the channel."""
+    client.chat_postMessage(
+        text=text,
+        blocks=blocks,
+        thread_ts=thread_ts,
+        channel=channel,
+        **kwargs,
+    )
 
 
 ## Payload methods ##

@@ -8,4 +8,4 @@ build:
     watched_files:
       - requirements.txt
 run:
-  main_file: main_new.py
+  main_file: main_async.py

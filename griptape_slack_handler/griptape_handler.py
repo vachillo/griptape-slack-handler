@@ -75,28 +75,34 @@ def agent(
     stream: bool,
 ) -> str:
     set_thread_alias(thread_alias)
-    dynamic_tools = dynamic_tools_enabled() or any(
-        [ruleset.meta.get("dynamic_tools", False) for ruleset in rulesets]
-    )
-    tools = get_tools(message, dynamic=dynamic_tools)
     EventBus.add_event_listeners(event_listeners)
 
-    if dynamic_tools:
+    if dynamic_tools_enabled():
+        EventBus.publish_event(ToolEvent(tools=[], stream=stream), flush=True)
+        tools = get_tools(message, dynamic=True)
         EventBus.publish_event(ToolEvent(tools=tools, stream=stream), flush=True)
+    else:
+        tools = get_tools(message, dynamic=False)
 
     agent = Agent(
-        input="user_id '<@{{ args[0] }}>': {{ args[1] }}",
         tools=tools,
         rulesets=rulesets,
+        rules=[
+            Rule(
+                f"You are responding to user '{user_id}'. Your input is this user's message. You can respond to the user with this syntax: '<@{user_id}>'"
+            ),
+        ],
         stream=stream,
     )
-    output = agent.run(user_id, message).output
+    output = agent.run(message).output
     if isinstance(output, ErrorArtifact):
         raise ValueError(output.to_text())
     return output.to_text()
 
 
 def is_relevant_response(message: str, response: str) -> bool:
+    # TODO: implment with EvalEngine
+
     agent = Agent(
         input="Given the following message: '{{ args[0] }}', is the following response helpful and relevant? Response: {{ args[1] }}",
         rulesets=[

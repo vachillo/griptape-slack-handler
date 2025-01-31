@@ -1,12 +1,18 @@
 import os
 
 
-def persist_thoughts_enabled() -> bool:
+def shadow_user_enabled() -> bool:
     """
-    Whether the Slack Bot will overwrite its thought process with the final output.
-    Defaults to False
+    Whether the slackbot will respond when a different user is mentioned. Defaults to False.
     """
-    return get_feature("PERSIST_THOUGHTS", False)
+    return get_feature("SHADOW_USER", False)
+
+
+def shadow_user_always_respond_enabled() -> bool:
+    """
+    Whether the slackbot will always respond when a different user is mentioned. Defaults to False.
+    """
+    return get_feature("SHADOW_USER_ALWAYS_RESPOND", False)
 
 
 def stream_output_enabled() -> bool:
