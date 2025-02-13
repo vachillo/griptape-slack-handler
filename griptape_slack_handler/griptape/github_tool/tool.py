@@ -128,7 +128,7 @@ class GitHubUserTool(BaseTool):
                     Optional(
                         Literal(
                             "comment",
-                            description="A friendly comment along with the approval.",
+                            description="A friendly comment along with the approval. something like 'looks good' or 'nice work'. be creative and use only lowercase letters.",
                         )
                     ): str,
                     Literal(
@@ -162,6 +162,41 @@ class GitHubUserTool(BaseTool):
             return InfoArtifact("pull request approved")
         except Exception as e:
             return ErrorArtifact(f"error approving pull request: {e}")
+
+    # activity to read PR data
+    @activity(
+        config={
+            "description": "Can be used to get data about what is changing in a pull request.",
+            "schema": Schema(
+                {
+                    Literal(
+                        "pull_request_id",
+                        description="The ID of the pull request to get data from.",
+                    ): str,
+                    Literal(
+                        "repo",
+                        description="The repository to get the contents from.",
+                    ): str,
+                    Literal(
+                        "owner",
+                        description="The owner or organization of the repository.",
+                    ): str,
+                },
+            ),
+        }
+    )
+    def get_pull_request_data(
+        self, pull_request_id: str, repo: str, owner: str
+    ) -> ListArtifact[TextArtifact] | ErrorArtifact:
+        try:
+            pull_request_files = (
+                self.client.get_repo(f"{owner}/{repo}")
+                .get_pull(int(pull_request_id))
+                .get_files()
+            )
+            return ListArtifact([TextArtifact(f.patch) for f in pull_request_files])
+        except Exception as e:
+            return ErrorArtifact(f"error getting pull request data: {e}")
 
     def _convert_github_content_to_artifact(
         self, content: ContentFile.ContentFile, list_mode: bool = False
