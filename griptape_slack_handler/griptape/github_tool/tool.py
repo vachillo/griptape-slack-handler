@@ -118,7 +118,7 @@ class GitHubUserTool(BaseTool):
 
     @activity(
         config={
-            "description": "Can be used to review a pull request in the Github repository.",
+            "description": "Can be used to approve or comment on a pull request in the Github repository.",
             "schema": Schema(
                 {
                     Literal(
@@ -132,7 +132,7 @@ class GitHubUserTool(BaseTool):
                         )
                     ): str,
                     Literal(
-                        "approved",
+                        "approve",
                         description="Whether to approve the pull request or not.",
                     ): bool,
                     Literal(
@@ -150,7 +150,7 @@ class GitHubUserTool(BaseTool):
     def review_pull_request(
         self,
         pull_request_id: str,
-        approved: bool,
+        approve: bool,
         repo: str,
         owner: str,
         comment: OptionalType[str] = None,
@@ -159,7 +159,7 @@ class GitHubUserTool(BaseTool):
             pull_request = self.client.get_repo(f"{owner}/{repo}").get_pull(
                 int(pull_request_id)
             )
-            event = "APPROVE" if approved else "COMMENT"
+            event = "APPROVE" if approve else "COMMENT"
             if comment is not None:
                 pull_request.create_review(body=comment, event=event)
             else:
