@@ -118,19 +118,23 @@ class GitHubUserTool(BaseTool):
 
     @activity(
         config={
-            "description": "Can be used to approve a pull request in the Github repository.",
+            "description": "Can be used to review a pull request in the Github repository.",
             "schema": Schema(
                 {
                     Literal(
                         "pull_request_id",
-                        description="The ID of the pull request to approve.",
+                        description="The ID of the pull request.",
                     ): str,
                     Optional(
                         Literal(
                             "comment",
-                            description="A friendly comment along with the approval. something like 'looks good' or 'nice work'. be creative and use only lowercase letters.",
+                            description="A friendly comment for the pull request review. something like 'looks good' or 'nice work'. be creative and use only lowercase letters.",
                         )
                     ): str,
+                    Literal(
+                        "approved",
+                        description="Whether to approve the pull request or not.",
+                    ): bool,
                     Literal(
                         "repo",
                         description="The repository to get the contents from.",
@@ -143,9 +147,10 @@ class GitHubUserTool(BaseTool):
             ),
         }
     )
-    def approve_pull_request(
+    def review_pull_request(
         self,
         pull_request_id: str,
+        approved: bool,
         repo: str,
         owner: str,
         comment: OptionalType[str] = None,
@@ -154,10 +159,11 @@ class GitHubUserTool(BaseTool):
             pull_request = self.client.get_repo(f"{owner}/{repo}").get_pull(
                 int(pull_request_id)
             )
+            event = "APPROVE" if approved else "COMMENT"
             if comment is not None:
-                pull_request.create_review(body=comment, event="APPROVE")
+                pull_request.create_review(body=comment, event=event)
             else:
-                pull_request.create_review(event="APPROVE")
+                pull_request.create_review(event=event)
 
             return InfoArtifact("pull request approved")
         except Exception as e:
