@@ -87,10 +87,10 @@ def _init_tools_dict() -> dict[str, tuple[BaseTool, str]]:
             DateTimeTool(),
             "Can be used to find the current date and time.",
         ),
-        "github": (
-            GitHubUserTool(),
-            "Can be used to interact with Github as a user.",
-        ),
+        # "github": (
+        #     GitHubUserTool(),
+        #     "Can be used to interact with Github as a user.",
+        # ),
         **cloud_tools_dict,
     }
 
