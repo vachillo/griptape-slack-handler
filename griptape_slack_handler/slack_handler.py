@@ -33,6 +33,8 @@ app: App = App(
     signing_secret=os.environ.get("SLACK_SIGNING_SECRET"),
     logger=logger,
     process_before_response=True,  # required because of threading
+    request_verification_enabled=False,  # required because of threading
+    token_verification_enabled=False,  # required because of threading
 )
 
 SHADOW_USER_ID = os.environ.get("SHADOW_USER_ID")

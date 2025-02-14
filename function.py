@@ -1,4 +1,5 @@
 from griptape_slack_handler.slack_handler import handle_slack_event
+import json
 
-def slack_function(raw_body, headers):
-    return handle_slack_event(raw_body, headers)
+def slack_function(body: dict, headers):
+    return handle_slack_event(json.dumps(body), headers)
