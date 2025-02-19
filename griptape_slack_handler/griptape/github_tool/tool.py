@@ -15,6 +15,8 @@ from griptape.utils.decorators import activity
 from griptape.tools import BaseTool
 from github import Auth, Github, ContentFile
 
+MAX_PR_FILES = 30
+
 
 def _common_schema() -> dict:
     return {
@@ -178,12 +180,12 @@ class GitHubUserTool(BaseTool):
     )
     def get_pull_request_data(
         self, pull_request_id: str, repo: str, owner: str
-    ) -> ListArtifact[TextArtifact] | ErrorArtifact:
+    ) -> ListArtifact | ErrorArtifact:
         try:
             pull_request_files = (
                 self.client.get_repo(f"{owner}/{repo}")
                 .get_pull(int(pull_request_id))
-                .get_files()
+                .get_files()[:MAX_PR_FILES]
             )
             pull_request_description = (
                 self.client.get_repo(f"{owner}/{repo}")
@@ -193,6 +195,7 @@ class GitHubUserTool(BaseTool):
             return ListArtifact(
                 [
                     TextArtifact(f"Description: {pull_request_description}"),
+                    *([InfoArtifact(f"Max files reached, returning the first {MAX_PR_FILES}")] if len(pull_request_files) == MAX_PR_FILES else []),
                     *[
                         TextArtifact(f"File Patch: {f.patch}")
                         for f in pull_request_files
