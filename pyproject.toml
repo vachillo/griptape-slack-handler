@@ -1,0 +1,17 @@
+[project]
+name = "griptape-slack-handler"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "azure-identity>=1.6.0",
+    "requests>=2.32.3",
+    "requests-toolbelt>=1.0.0",
+    "slack-bolt>=1.22.0",
+    "PyGithub>=2.5.0",
+    "griptape[drivers-web-scraper-trafilatura,drivers-web-search-duckduckgo] @ git+https://github.com/griptape-ai/griptape.git@main",
+    "ruff>=0.11.8",
+    "invoke>=2.2.0",
+    "python-dotenv>=1.1.0",
+]
